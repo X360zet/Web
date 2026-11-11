@@ -1,71 +1,80 @@
-import { Table, Tag, Button, Space, Typography } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
-import { Link } from 'react-router-dom';
-
-interface Transaction {
-  id: string;
-  date: string;
-  description: string;
-  category: string;
-  amount: number;
-  type: 'income' | 'expense';
-}
-
-const mockData: Transaction[] = [
-  { id: '1', date: '2025-01-15', description: 'Salary', category: 'Income', amount: 5000, type: 'income' },
-  { id: '2', date: '2025-01-16', description: 'Groceries', category: 'Food', amount: 150, type: 'expense' },
-  { id: '3', date: '2025-01-17', description: 'Electric bill', category: 'Utilities', amount: 80, type: 'expense' },
-  { id: '4', date: '2025-01-18', description: 'Freelance work', category: 'Income', amount: 800, type: 'income' },
-];
+// client/src/pages/user/TransactionsPage.tsx
+import { useState } from 'react';
+import { Card, Table, Button, Input, Select, Space, Popconfirm, message } from 'antd';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { getTransactions, deleteTransaction, Transaction, TransactionType, TransactionStatus } from '../../api/transactions';
+import { useAuth } from '../../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import dayjs from 'dayjs';
 
 export default function TransactionsPage() {
+  const { role } = useAuth();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  
+  const [filters, setFilters] = useState<{
+    type: TransactionType | undefined;
+    status: TransactionStatus | undefined;
+    search: string;
+  }>({ 
+    type: undefined, 
+    status: undefined, 
+    search: '' 
+  });
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['transactions-all', filters],
+    queryFn: () => getTransactions({
+      type: filters.type,
+      status: filters.status,
+      search: filters.search || undefined,
+      page: 1,
+      pageSize: 50
+    }),
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: (id: number) => deleteTransaction(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transactions-all'] });
+      message.success('Запись удалена');
+    },
+  });
   const columns = [
-    {
-      title: 'Date',
-      dataIndex: 'date',
-      key: 'date',
-      sorter: (a: Transaction, b: Transaction) => a.date.localeCompare(b.date),
-    },
-    {
-      title: 'Description',
-      dataIndex: 'description',
-      key: 'description',
-    },
-    {
-      title: 'Category',
-      dataIndex: 'category',
-      key: 'category',
-    },
-    {
-      title: 'Amount',
-      dataIndex: 'amount',
-      key: 'amount',
-      render: (amount: number, record: Transaction) => (
-        <span style={{ color: record.type === 'income' ? '#52c41a' : '#ff4d4f', fontWeight: 'bold' }}>
-          {record.type === 'income' ? '+' : '-'}${amount.toFixed(2)}
-        </span>
-      ),
-      sorter: (a: Transaction, b: Transaction) => a.amount - b.amount,
-    },
-    {
-      title: 'Type',
-      key: 'type',
-      dataIndex: 'type',
-      render: (type: 'income' | 'expense') => (
-        <Tag color={type === 'income' ? 'green' : 'red'}>{type.toUpperCase()}</Tag>
-      ),
-    },
+    { title: 'Название', dataIndex: 'title', key: 'title', render: (t: string, r: Transaction) => <a onClick={() => navigate(`/transactions/${r.id}/edit`)}>{t}</a> },
+    { title: 'Категория', dataIndex: 'categoryName', key: 'categoryName' },
+    { title: 'Сумма', key: 'amount', render: (_: unknown, r: Transaction) => <span style={{ color: r.type === 'Expense' ? '#ff4d4f' : '#52c41a', fontWeight: 600 }}>{r.type === 'Expense' ? '-' : '+'}{r.amount.toLocaleString('ru-RU')} ₽</span> },
+    { title: 'Дата', dataIndex: 'transactionDate', key: 'date', render: (d?: string) => d ? dayjs(d).format('DD.MM.YYYY') : '-' },
+    { title: 'Действия', key: 'actions', render: (_: unknown, r: Transaction) => (
+      <Space>
+        <Button size="small" icon={<EditOutlined />} onClick={() => navigate(`/transactions/${r.id}/edit`)} />
+        <Popconfirm title="Удалить?" onConfirm={() => deleteMut.mutate(r.id)}>
+          <Button size="small" icon={<DeleteOutlined />} danger />
+        </Popconfirm>
+      </Space>
+    )}
   ];
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <Typography.Title level={3}>Transactions</Typography.Title>
-        <Button type="primary" icon={<PlusOutlined />}>
-          <Link to="/transactions/new">Add Transaction</Link>
-        </Button>
-      </div>
-      <Table columns={columns} dataSource={mockData} rowKey="id" />
-    </div>
+    <Card title="💰 Все финансовые записи">
+      <Space style={{ marginBottom: 16, flexWrap: 'wrap' }}>
+        <Input 
+          placeholder="Поиск..." 
+          value={filters.search} 
+          onChange={e => setFilters(f => ({ ...f, search: e.target.value }))} 
+          style={{ width: 200 }} 
+        />
+        <Select 
+          placeholder="Тип" 
+          allowClear 
+          style={{ width: 120 }} 
+          onChange={val => setFilters(f => ({ ...f, type: val as TransactionType }))} 
+          options={[{ value: 'Expense', label: 'Расход' }, { value: 'Income', label: 'Доход' }]} 
+        />
+        {role === 'User' && <Button type="primary" onClick={() => navigate('/transactions/new')}>+ Добавить</Button>}
+      </Space>
+      <Table dataSource={data?.items} columns={columns} rowKey="id" loading={isLoading} pagination={{ pageSize: 10 }} />
+    </Card>
   );
 }

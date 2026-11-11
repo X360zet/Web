@@ -1,13 +1,2 @@
 import { Empty } from 'antd';
-
-interface Props {
-  description?: string;
-}
-
-export default function PageEmpty({ description = 'No data' }: Props) {
-  return (
-    <div style={{ padding: 48 }}>
-      <Empty description={description} />
-    </div>
-  );
-}
+export default function PageEmpty({ desc = 'Нет данных' }: { desc?: string }) { return <Empty description={desc} />; }

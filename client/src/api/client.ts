@@ -1,67 +1,70 @@
-const BASE_URL = '';
+// src/api/client.ts
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
-interface ProblemDetails {
-  title?: string;
-  detail?: string;
-  status?: number;
+export interface LoginResponse {
+  accessToken: string;
+  user: {
+    id: string;
+    displayName: string;
+    email: string;
+    role: 'User' | 'Operator' | 'Admin';
+  };
 }
 
-export class ApiError extends Error {
-  constructor(
-    public readonly status: number,
-    message: string,
-  ) {
-    super(message);
-    this.name = 'ApiError';
-  }
+// User может не быть в ответе регистрации (согласно Лабе 3)
+export interface RegisterResponse {
+  accessToken: string;
+  user?: {
+    id: string;
+    displayName: string;
+    email: string;
+    role: 'User' | 'Operator' | 'Admin';
+  };
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+export interface MeResponse {
+  id: string;
+  email: string;
+  displayName: string;
+  role: 'User' | 'Operator' | 'Admin';
+}
+
+export const api = async <T = unknown>(
+  path: string, 
+  options: RequestInit = {}
+): Promise<T> => {
   const token = localStorage.getItem('token');
-
-  const headers: Record<string, string> = {
+  const headers: HeadersInit = {
     'Content-Type': 'application/json',
-    ...(options.headers as Record<string, string>),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  const response = await fetch(`${BASE_URL}${path}`, { ...options, headers });
-
-  if (!response.ok) {
-    let message = `HTTP ${response.status}`;
-    try {
-      const problem: ProblemDetails = await response.json();
-      message = problem.detail ?? problem.title ?? message;
-    } catch {
-      // ignore JSON parse errors — keep default message
+  try {
+    const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+    
+    if (!res.ok) {
+      let errData = {};
+      // Пробуем прочитать JSON, но если это HTML (например, 404), игнорируем ошибку парсинга
+      try {
+        errData = await res.json();
+      } catch { /* ignore */ }
+      
+      const message = 
+        (errData as { detail?: string }).detail || 
+        (errData as { title?: string }).title || 
+        `HTTP ${res.status}: ${res.statusText}`;
+      throw new Error(message);
     }
-    throw new ApiError(response.status, message);
+
+    // Если ответ пустой (204 No Content), возвращаем undefined
+    if (res.status === 204) return undefined as T;
+
+    return res.json() as Promise<T>;
+  } catch (error: unknown) {
+    // Если ошибка сети (CORS, сервер выключен)
+    if (error instanceof TypeError && error.message === 'Failed to fetch') {
+      throw new Error('Не удалось подключиться к серверу. Проверьте, запущен ли бэкенд (dotnet run).');
+    }
+    throw error;
   }
-
-  if (response.status === 204) return undefined as T;
-
-  return response.json() as Promise<T>;
-}
-
-export const apiClient = {
-  get: <T>(path: string) => request<T>(path),
-  post: <T>(path: string, body?: unknown) =>
-    request<T>(path, {
-      method: 'POST',
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    }),
-  put: <T>(path: string, body?: unknown) =>
-    request<T>(path, {
-      method: 'PUT',
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    }),
-  patch: <T>(path: string, body?: unknown) =>
-    request<T>(path, {
-      method: 'PATCH',
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    }),
-  delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
 };

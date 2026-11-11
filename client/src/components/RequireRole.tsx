@@ -1,15 +1,7 @@
-import { ReactNode } from 'react';
+import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import type { Role } from '../contexts/AuthContext';
-import ForbiddenPage from '../pages/ForbiddenPage';
 
-interface Props {
-  roles: Role[];
-  children: ReactNode;
-}
-
-export function RequireRole({ roles, children }: Props) {
+export default function RequireRole({ allowedRoles }: { allowedRoles: string[] }) {
   const { role } = useAuth();
-  if (!role || !roles.includes(role)) return <ForbiddenPage />;
-  return <>{children}</>;
+  return allowedRoles.includes(role || '') ? <Outlet /> : <Navigate to="/403" replace />;
 }

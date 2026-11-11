@@ -1,122 +1,39 @@
-import { useState } from 'react';
-import { Form, Input, InputNumber, Select, Button, Card, Typography, Space, message } from 'antd';
+// client/src/pages/user/NewTransactionPage.tsx
+import { Card, Form, Input, InputNumber, Select, Button, message } from 'antd';
 import { useNavigate } from 'react-router-dom';
-
-const { Option } = Select;
-
-interface FormValues {
-  date: string;
-  description: string;
-  category: string;
-  amount: number;
-  type: 'income' | 'expense';
-}
-
-const categories = [
-  'Food',
-  'Transport',
-  'Utilities',
-  'Entertainment',
-  'Shopping',
-  'Healthcare',
-  'Education',
-  'Income',
-  'Other',
-];
+import { CreateTransactionDto } from '../../api/transactions';  // ← Импортируйте тип
 
 export default function NewTransactionPage() {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
+  const [form] = Form.useForm(); //ВОПРОС !!!
 
-  const handleSubmit = async (values: FormValues) => {
-    setLoading(true);
-    try {
-      // TODO: Implement API call to create transaction
-      console.log('Transaction created:', values);
-      message.success('Transaction added successfully!');
-      navigate('/transactions');
-    } catch (error) {
-      message.error('Failed to add transaction. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+  // 🔹 Замените any на правильный тип
+  const onFinish = (values: CreateTransactionDto) => {
+    console.log(values);
+    message.success('Транзакция создана (заглушка)');
+    navigate('/transactions');
   };
 
   return (
-    <div>
-      <Typography.Title level={3}>Add New Transaction</Typography.Title>
-      <Card style={{ maxWidth: 600 }}>
-        <Form layout="vertical" onFinish={handleSubmit} autoComplete="off">
-          <Form.Item
-            label="Type"
-            name="type"
-            rules={[{ required: true, message: 'Please select transaction type' }]}
-            initialValue="expense"
-          >
-            <Select>
-              <Option value="expense">Expense</Option>
-              <Option value="income">Income</Option>
-            </Select>
-          </Form.Item>
-
-          <Form.Item
-            label="Date"
-            name="date"
-            rules={[{ required: true, message: 'Please enter date' }]}
-          >
-            <Input type="date" />
-          </Form.Item>
-
-          <Form.Item
-            label="Description"
-            name="description"
-            rules={[{ required: true, message: 'Please enter description' }]}
-          >
-            <Input placeholder="e.g., Grocery shopping" />
-          </Form.Item>
-
-          <Form.Item
-            label="Category"
-            name="category"
-            rules={[{ required: true, message: 'Please select category' }]}
-          >
-            <Select placeholder="Select a category">
-              {categories.map((cat) => (
-                <Option key={cat} value={cat}>{cat}</Option>
-              ))}
-            </Select>
-          </Form.Item>
-
-          <Form.Item
-            label="Amount"
-            name="amount"
-            rules={[
-              { required: true, message: 'Please enter amount' },
-              { type: 'number', min: 0.01, message: 'Amount must be greater than 0' },
-            ]}
-          >
-            <InputNumber
-              style={{ width: '100%' }}
-              placeholder="0.00"
-              min={0.01}
-              step={0.01}
-              precision={2}
-              addonBefore="$"
-            />
-          </Form.Item>
-
-          <Form.Item>
-            <Space>
-              <Button type="primary" htmlType="submit" loading={loading}>
-                Add Transaction
-              </Button>
-              <Button onClick={() => navigate('/transactions')}>
-                Cancel
-              </Button>
-            </Space>
-          </Form.Item>
-        </Form>
-      </Card>
-    </div>
+    <Card title="Новая транзакция">
+      <Form form={form} onFinish={onFinish} layout="vertical">
+        <Form.Item name="title" label="Название" rules={[{ required: true }]}>
+          <Input />
+        </Form.Item>
+        <Form.Item name="amount" label="Сумма" rules={[{ required: true }]}>
+          <InputNumber style={{ width: '100%' }} />
+        </Form.Item>
+        <Form.Item name="type" label="Тип" rules={[{ required: true }]}>
+          <Select>
+            <Select.Option value="Expense">Расход</Select.Option>
+            <Select.Option value="Income">Доход</Select.Option>
+          </Select>
+        </Form.Item>
+        <Form.Item>
+          <Button type="primary" htmlType="submit">Создать</Button>
+          <Button style={{ marginLeft: 8 }} onClick={() => navigate('/transactions')}>Отмена</Button>
+        </Form.Item>
+      </Form>
+    </Card>
   );
 }
